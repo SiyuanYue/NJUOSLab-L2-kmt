@@ -19,6 +19,6 @@ typedef struct task
 }task_t;
 
 task_t *alltasks[MAX_TASKS];
-size_t task_cnt;
+size_t task_cnt; //最大index
 task_t *currents[MAX_CPU];//每个CPU的current线程
 #define _current currents[cpu_current()]//当前cpu的current线程

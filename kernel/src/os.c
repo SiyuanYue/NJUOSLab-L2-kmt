@@ -54,20 +54,21 @@ void sort_handlers()
 //   }
 // }
 void foo(void * s ){
-	while(1) putch(*(const char *)s);
+	while(1)
+		putch(*(const char *)s);
 }
-static void test01()
+void test01()
 {
 	task_t *task1=(task_t*) pmm->alloc(sizeof(task_t));
 	task_t *task2=(task_t*) pmm->alloc(sizeof(task_t));
 	kmt->create(task1,"foo1",foo,(void *)"a");
-	kmt->create(task2,"foo1",foo,(void *)"b");
+	kmt->create(task2,"foo2",foo,(void *)"b");
 }
 static void os_init()
 {
 	pmm->init();
 	init_handlers_sorted_by_seq();
-	//printf("kmt_init:\n");
+	printf("kmt_init:\n");
 	kmt->init();
 	for (size_t i = 0; i < cpu_count(); i++)
 	{
@@ -76,15 +77,14 @@ static void os_init()
 		currents[i]=idle;
 	}
 	_current->status=RUNNING;
-	iset(true);
-	test01();
+	//printf("start\n");
+	//test01();
 	//printf("%d\n",ienabled());
 	// task_t* tty1=pmm->alloc(sizeof(task_t));
 	// task_t* tty2=pmm->alloc(sizeof(task_t));
 
-	// printf("dev_init:\n");
-	// dev->init();
-
+	printf("dev_init:\n");
+	dev->init();
 	// kmt->create(tty1, "tty_reader", tty_reader, "tty1");
   	// kmt->create(tty2, "tty_reader", tty_reader, "tty2");
 
@@ -98,9 +98,7 @@ Context *os_trap(Event ev, Context *ctx)
 		handlers_seq h = handlers_sorted_by_seq[i];
 		if (h.event == EVENT_NULL || h.event == ev.event)
 		{
-			putch('r');
-			putch('\n');
-			//printf("ok?\n");
+			//printf("%d  seq:%d\n",i,h.seq);
 			Context *r = h.handler(ev, ctx);
 			panic_on(r && next, "returning multiple contexts");
 			if (r)
@@ -123,7 +121,7 @@ void os_irq(int seq, int event, handler_t handler)
 }
 static void os_run()
 {
-	// iset(true);
+	iset(true);
 	// for (const char *s = "Hello World from CPU #*\n"; *s; s++)
 	// {
 	// 	putch(*s == '*' ? '0' + cpu_current() : *s);

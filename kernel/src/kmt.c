@@ -59,9 +59,10 @@ void spin_unlock(spinlock_t *lk)
 {
     // putch('u');
     // putch('\n');
-    assert(lk->lock && lk->cpu == cpu_current());
+    assert(lk->lock);
+    assert(lk->cpu == cpu_current());
     lk->cpu = -1;
-    if(cpus[cpu_current()].noff == 1)
+    if (cpus[cpu_current()].noff == 1)
         atomic_xchg(&lk->lock, 0);
     pop_off();
 }
@@ -94,14 +95,20 @@ static Context *kmt_context_save(Event ev, Context *context)
 }
 static Context *kmt_schedule(Event ev, Context *context)
 {
+    // printf("current_index: %d\n", _current->index);
     size_t i = _current->index + 1;
-    for (; i < MAX_TASKS; i++)
+    if(task_cnt==_current->index)
+        i=0;
+    for (; i <= task_cnt; i++)
     {
-        if (i == MAX_TASKS)
-            i = 0;
         if (alltasks[i] && alltasks[i]->status != BLOCKED)
             break;
+        if (i == task_cnt)
+            i = 0;
     }
+    // assert(i==0);
+    // printf("i:%d\n", i);
+    // printf("%s\n", alltasks[i]->name);
     _current = alltasks[i];
     _current->status = RUNNING;
     return _current->context;
@@ -110,40 +117,24 @@ static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), 
 {
     task->status = RUNABLE;
     assert(task);
-    putch('c');
-    putch('\n');
+    printf("creat-thread\n");
     kmt->spin_lock(&kt);
     strcpy(task->name, name);
     Area stack = (Area){task->stack, task + 1};
     task->context = kcontext(stack, entry, arg);
-    // if (!_current)
-    // { //主线程第一次调用，没记录
-    //     task_t *th_main = (task_t *)pmm->alloc(sizeof(task_t));
-    //     if(!th_main) return 1;
-    //     th_main->status = RUNNING;
-    //     putch('m');
-    //     putch('\n');
-    //     strcpy(th_main->name, "main");
-    //     _current = th_main;
-    //     //为al_tasks添加current节点
-    //     size_t i = 0;
-    //     for (; i < task_cnt; i++)
-    //     {
-    //         if(alltasks[i]==NULL)
-    //             break;
-    //     }
-    //     alltasks[i]=_current;
-    //     _current->index=i;
-    // }
-    //为al_tasks添加创立的task节点
     size_t i = 0;
-    for (; i < task_cnt; i++)
+    for (; i < MAX_TASKS; i++) //原本task_cnt忘记更新，且task_cnt一直为0啊！！！  task_cnt-->MAX_TASKS
     {
         if (alltasks[i] == NULL)
+        {
             break;
+        }
     }
+    printf("task->index: %d\n", i);
     alltasks[i] = task;
     task->index = i;
+    if (i >= task_cnt)
+        task_cnt = i;
     kmt->spin_unlock(&kt);
     return 0;
 }
@@ -151,6 +142,8 @@ static void kmt_teardown(task_t *task)
 {
     kmt->spin_lock(&kt);
     alltasks[task->index] = NULL;
+    if (task_cnt == task->index)
+        task_cnt--;
     pmm->free(task);
     kmt->spin_unlock(&kt);
 }
