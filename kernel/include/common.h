@@ -19,14 +19,33 @@ typedef struct header_t
 {
 	void *nothing;
 	int size;
-	int magic;    
+	int magic;
 }header_t;
 typedef struct freenode_t
 {
 	struct freenode_t* next;
 	int size;
 	int magic;
-}freenode_t;	
+}freenode_t;
+
+
+struct spinlock
+{
+  int lock;
+  int cpu;
+  char name[20];
+};
+
+struct semaphore
+{
+    int count;
+    char name[20];
+    struct spinlock lock;
+    task_t* pool[64];
+    int l;
+    int r;
+};
 
 
 void * isAbleHold(void *start,size_t *size);
+
