@@ -15,7 +15,7 @@ typedef struct CPU
     int noff;   //递归深度
 } CPU;
 CPU cpus[MAX_CPU];
-static void push_off()
+void push_off()
 {
     int i = ienabled();
     iset(false);
@@ -24,7 +24,7 @@ static void push_off()
         cpus[c].intena = i;
     cpus[c].noff++;
 }
-static void pop_off()
+void pop_off()
 {
     int c = cpu_current();
     assert(cpus[c].noff >= 1);
@@ -34,13 +34,13 @@ static void pop_off()
         iset(true);
     }
 }
-static void spin_init(spinlock_t *lk, const char *name)
+void spin_init(spinlock_t *lk, const char *name)
 {
     lk->lock = 0;
     lk->cpu = -1;
     strcpy(lk->name, name);
 }
-static void spin_lock(spinlock_t *lk)
+void spin_lock(spinlock_t *lk)
 {
     //assert(lk->lock==0);
     // if (cpus[cpu_current()].noff == 1)
@@ -57,7 +57,7 @@ static void spin_lock(spinlock_t *lk)
     //printf("thread %s : %s \n",_current->name ,lk->name);
     lk->cpu = cpu_current();
 }
-static void spin_unlock(spinlock_t *lk)
+void spin_unlock(spinlock_t *lk)
 {
     assert(lk->cpu == cpu_current());
     if (cpus[cpu_current()].noff == 1)
@@ -157,7 +157,7 @@ static void kmt_init()
     kmt->spin_init(&kt, "thread_lock_task");
     kmt->spin_init(&tr, "trap_lock");
 }
-static void sem_init(sem_t *sem, const char *name, int value)
+void sem_init(sem_t *sem, const char *name, int value)
 {
     kmt->spin_init(&(sem->lock),name);
     sem->count = value;
@@ -165,73 +165,46 @@ static void sem_init(sem_t *sem, const char *name, int value)
     sem->r = 0;
     strcpy(sem->name, name);
 }
-// static void wakeup(sem_t *sem)
-// {
-//     assert(sem->l - sem->r != 0);
-//     task_t *t = sem->pool[sem->l];
-//     sem->l++;
-//     if (sem->l == MAX_TASKS)
-//         sem->l = 0;
-//     t->status = RUNABLE;
-//     kmt->spin_unlock(&sem->lock);
-// }
-// static void sem_signal(sem_t *sem)
-// {
-//     kmt->spin_lock(&sem->lock);
-//     sem->count++;
-//     if (sem->count <= 0)
-//     {
-//         wakeup(sem);
-//     }
-//     else
-//     {
-//         kmt->spin_unlock(&sem->lock);
-//     }
-// }
-// static void block(sem_t *sem)
-// { //阻塞
-//     _current->status = BLOCKED;
-//     sem->pool[sem->r] = _current;
-//     sem->r++;
-//     if (sem->r == MAX_TASKS)
-//         sem->r = 0;
-//     kmt->spin_unlock(&sem->lock);
-//     yield();
-// }
-// static void sem_wait(sem_t *sem)
-// { //中断处理程序不可睡眠(sem_wait)，可以调用 sem_signal。
-//     kmt->spin_lock(&sem->lock);
-//     sem->count--;
-//     while (sem->count < 0)
-//         block(sem);
-//     kmt->spin_unlock(&sem->lock);
-// }
-void sem_wait_base(sem_t *sem)
-{//P()
-    assert(sem);
-    bool succ=false;
-    while(!succ)
-    {
-        kmt->spin_lock(&(sem->lock));
-        if(sem->count>0)
-        {
-            sem->count--;
-            succ=true;
-        }
-        kmt->spin_unlock(&(sem->lock));
-        if(!succ)
-		{
-            assert(ienabled());
-            yield();
-        }
-  }
+void wakeup(sem_t *sem)
+{
+    assert(sem->l - sem->r != 0);
+    task_t *t = sem->pool[sem->l];
+    sem->l++;
+    if (sem->l == MAX_TASKS)
+        sem->l = 0;
+    t->status = RUNABLE;
+    kmt->spin_unlock(&sem->lock);
 }
-void sem_signal_base(sem_t *sem)
-{//V()
-    assert(sem);
-    kmt->spin_lock(&(sem->lock));
+void sem_signal(sem_t *sem)
+{
+    kmt->spin_lock(&sem->lock);
     sem->count++;
-    kmt->spin_unlock(&(sem->lock));
+    if (sem->count <= 0)
+    {
+        wakeup(sem);
+    }
+    else
+    {
+        kmt->spin_unlock(&sem->lock);
+    }
+}
+void block(sem_t *sem)
+{ //阻塞
+    _current->status = BLOCKED;
+    sem->pool[sem->r] = _current;
+    sem->r++;
+    if (sem->r == MAX_TASKS)
+        sem->r = 0;
+    kmt->spin_unlock(&sem->lock);
+    yield();
+}
+void sem_wait(sem_t *sem)
+{ //中断处理程序不可睡眠(sem_wait)，可以调用 sem_signal。
+    kmt->spin_lock(&sem->lock);
+    sem->count--;
+    while (sem->count < 0)
+        block(sem);
+    kmt->spin_unlock(&sem->lock);
 }
 MODULE_DEF(kmt) = {
     .init = kmt_init,
@@ -241,5 +214,5 @@ MODULE_DEF(kmt) = {
     .spin_lock = spin_lock,
     .spin_unlock = spin_unlock,
     .sem_init = sem_init,
-    .sem_signal = sem_signal_base,
-    .sem_wait = sem_wait_base};
+    .sem_signal = sem_signal,
+    .sem_wait = sem_wait};

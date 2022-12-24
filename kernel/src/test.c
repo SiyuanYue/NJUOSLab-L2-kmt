@@ -1,45 +1,43 @@
 #include <test.h>
 #include <os.h>
 #include <common.h>
-#define P sem_wait_base
-#define V sem_signal_base
-// void P(sem_t *sem);
-// void V(sem_t *sem);
+void P(sem_t *sem);
+void V(sem_t *sem);
 static inline task_t *task_alloc() {
   return pmm->alloc(sizeof(task_t));
 }
-// void P(sem_t *sem)
-// {
-//   assert(sem);
-//   bool succ=false;
-//   while(!succ)
-//   {
-//     kmt->spin_lock(&(sem->lock));
-//     if(sem->count>0)
-//     {
-//       sem->count--;
-//       succ=true;
-//     }
-//     kmt->spin_unlock(&(sem->lock));
-//     if(!succ)
-// 		{
-//       assert(ienabled());
-//       yield();
+void P(sem_t *sem)
+{
+  assert(sem);
+  bool succ=false;
+  while(!succ)
+  {
+    kmt->spin_lock(&(sem->lock));
+    if(sem->count>0)
+    {
+      sem->count--;
+      succ=true;
+    }
+    kmt->spin_unlock(&(sem->lock));
+    if(!succ)
+		{
+      assert(ienabled());
+      yield();
 
-//       //printf("before\n");yield();
-//     }
-//   }
-//   //kmt->sem_wait(sem);
-// }
-// void V(sem_t *sem)
-// {
-//   assert(sem);
-//   kmt->spin_lock(&(sem->lock));
-//   sem->count++;
-//   //printf("%s : %d\n",sem->name,sem->count);
-//   kmt->spin_unlock(&(sem->lock));
-//   //kmt->sem_signal(sem);
-// }
+      //printf("before\n");yield();
+    }
+  }
+  //kmt->sem_wait(sem);
+}
+void V(sem_t *sem)
+{
+  assert(sem);
+  kmt->spin_lock(&(sem->lock));
+  sem->count++;
+  //printf("%s : %d\n",sem->name,sem->count);
+  kmt->spin_unlock(&(sem->lock));
+  //kmt->sem_signal(sem);
+}
 void foo(void *s ){
 	while(1)
 		putch(*(const char *)s);
