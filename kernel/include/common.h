@@ -46,7 +46,7 @@ typedef struct semaphore
     int r;
 }semaphore;
 
-
-void * isAbleHold(void *start,size_t *size);
+void sem_wait_base(sem_t *sem);
+void sem_signal_base(sem_t *sem);
 
 
