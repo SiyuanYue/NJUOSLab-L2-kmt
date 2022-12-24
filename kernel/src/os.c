@@ -74,8 +74,8 @@ static void os_init()
 	// task_t* tty1=pmm->alloc(sizeof(task_t));
 	// task_t* tty2=pmm->alloc(sizeof(task_t));
 
-	//TODO :实现信号量 ：producer&consumer
-	test02();
+	//TODO :实现信号量 P（消费者） V（生产者） 操作
+	test03();
 	// printf("dev_init:\n");
 	// dev->init();
 	// kmt->create(tty1, "tty_reader", tty_reader, "tty1");

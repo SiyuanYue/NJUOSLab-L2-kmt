@@ -3,6 +3,9 @@
 #include <common.h>
 void P(sem_t *sem);
 void V(sem_t *sem);
+static inline task_t *task_alloc() {
+  return pmm->alloc(sizeof(task_t));
+}
 void P(sem_t *sem)
 {
   assert(sem);
@@ -18,9 +21,13 @@ void P(sem_t *sem)
     kmt->spin_unlock(&(sem->lock));
     if(!succ)
 		{
-        yield();printf("ok\n");
+      assert(ienabled());
+      yield();
+
+      //printf("before\n");yield();
     }
   }
+  //kmt->sem_wait(sem);
 }
 void V(sem_t *sem)
 {
@@ -29,6 +36,7 @@ void V(sem_t *sem)
   sem->count++;
   //printf("%s : %d\n",sem->name,sem->count);
   kmt->spin_unlock(&(sem->lock));
+  //kmt->sem_signal(sem);
 }
 void foo(void *s ){
 	while(1)
@@ -49,8 +57,17 @@ void test02()
 {
 	kmt->sem_init(&empty1,"empty1",1);
 	kmt->sem_init(&fill1,"fill1",0);
-	task_t* task1= (task_t*) pmm->alloc(sizeof(task_t));
-	task_t* task2= (task_t*) pmm->alloc(sizeof(task_t));
-	kmt->create(task1,"producer1",producer1,NULL);
-	kmt->create(task2,"consumer1",consumer1,NULL);
+  for (int i = 0; i < 4; i++) // 4 个生产者
+    kmt->create(task_alloc(),"producer",producer1,NULL);
+	for (int i = 0; i < 5; i++)
+	  kmt->create(task_alloc(),"consumer",consumer1,NULL);
+}
+void test03()
+{
+  kmt->sem_init(&empty1,"empty1",2);
+	kmt->sem_init(&fill1,"fill1",0);
+  for (int i = 0; i < 4; i++) // 4 个生产者
+    kmt->create(task_alloc(),"producer",producer1,NULL);
+	for (int i = 0; i < 5; i++)
+	  kmt->create(task_alloc(),"consumer",consumer1,NULL);
 }

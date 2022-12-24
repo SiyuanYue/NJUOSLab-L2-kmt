@@ -14,7 +14,7 @@ typedef struct task
   int index;//该task在数组alltasks中的下标
   enum tr_status status;//该task的运行状态
   char name[20];
-  Context *context;//中断不允许嵌套
+  Context context;//中断不允许嵌套
   uint8_t stack[STACK_SIZE];//内核栈
 }task_t;
 

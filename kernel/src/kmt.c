@@ -42,12 +42,6 @@ void spin_init(spinlock_t *lk, const char *name)
 }
 void spin_lock(spinlock_t *lk)
 {
-    // if(strcmp(lk->name,"empty1")==0)
-    // {
-    //     printf("l\n");
-    // }
-    // putch('l');
-    // putch('\n');
     //assert(lk->lock==0);
     // if (cpus[cpu_current()].noff == 1)
     // {
@@ -59,7 +53,8 @@ void spin_lock(spinlock_t *lk)
         }
     // }
     push_off();
-    printf("thread: %s: %s , cpu's intena:%d  \n",_current->name ,lk->name,cpus[cpu_current()].intena);
+    //printf("thread %s : %s , cpu's intena:%d  \n",_current->name ,lk->name,cpus[cpu_current()].intena);
+    //printf("thread %s : %s \n",_current->name ,lk->name);
     lk->cpu = cpu_current();
 }
 void spin_unlock(spinlock_t *lk)
@@ -74,7 +69,12 @@ void spin_unlock(spinlock_t *lk)
 
 static Context *kmt_context_save(Event ev, Context *context)
 {
-    memcpy(_current->context, context, sizeof(Context));
+    // if(ev.event==EVENT_YIELD)
+    // {
+    //     printf("yield - save context(%s)\n",_current->name);
+    // }
+    //memcpy(_current->context, context, sizeof(Context));
+    _current->context=*context;
     return NULL;
 }
 static Context *kmt_schedule(Event ev, Context *context)
@@ -87,15 +87,22 @@ static Context *kmt_schedule(Event ev, Context *context)
         if (alltasks[i] && alltasks[i]->status != BLOCKED)
             break;
         if (i == task_cnt)
+        {
             i = 0;
+            assert(false);
+        }
     }
-    // assert(i==0);
-    // printf("i:%d\n", i);
-    //printf("%s      :\n", alltasks[i]->name);
     _current = alltasks[i];
     _current->status = RUNNING;
-    assert(_current->context);
-    return _current->context;
+    // if(ev.event==EVENT_YIELD)
+    // {
+    //     printf("yield - schedule to [%s]\n",_current->name);
+    // }
+    // else
+    // {
+    //     printf("schedule to [%s]\n",_current->name);
+    // }
+    return &(_current->context);
 }
 static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg)
 {
@@ -105,7 +112,7 @@ static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), 
     kmt->spin_lock(&kt);
     strcpy(task->name, name);
     Area stack = (Area){task->stack, task + 1};
-    task->context = kcontext(stack, entry, arg);
+    task->context =*kcontext(stack, entry, arg);
     size_t i = 0;
     for (; i < MAX_TASKS; i++) //原本task_cnt忘记更新，且task_cnt一直为0啊！！！  task_cnt-->MAX_TASKS
     {
@@ -172,7 +179,7 @@ void sem_signal(sem_t *sem)
 {
     kmt->spin_lock(&sem->lock);
     sem->count++;
-    if (sem->count >= 0)
+    if (sem->count <= 0)
     {
         wakeup(sem);
     }
@@ -189,7 +196,7 @@ void block(sem_t *sem)
     if (sem->r == MAX_TASKS)
         sem->r = 0;
     kmt->spin_unlock(&sem->lock);
-    //yield();
+    yield();
 }
 void sem_wait(sem_t *sem)
 { //中断处理程序不可睡眠(sem_wait)，可以调用 sem_signal。
