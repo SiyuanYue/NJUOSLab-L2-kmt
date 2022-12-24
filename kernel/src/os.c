@@ -1,6 +1,7 @@
 #include <limits.h>
 #include <devices.h>
 #include <os.h>
+#include <test.h>
 typedef struct handlers_seq
 {  //每个事件处理的结构体
 	handler_t handler;
@@ -53,17 +54,7 @@ void sort_handlers()
 //     tty->ops->write(tty, 0, resp, strlen(resp));
 //   }
 // }
-void foo(void * s ){
-	while(1)
-		putch(*(const char *)s);
-}
-void test01()
-{
-	task_t *task1=(task_t*) pmm->alloc(sizeof(task_t));
-	task_t *task2=(task_t*) pmm->alloc(sizeof(task_t));
-	kmt->create(task1,"foo1",foo,(void *)"a");
-	kmt->create(task2,"foo2",foo,(void *)"b");
-}
+
 static void os_init()
 {
 	pmm->init();
@@ -83,8 +74,10 @@ static void os_init()
 	// task_t* tty1=pmm->alloc(sizeof(task_t));
 	// task_t* tty2=pmm->alloc(sizeof(task_t));
 
-	printf("dev_init:\n");
-	dev->init();
+	//TODO :实现信号量 ：producer&consumer
+	test02();
+	// printf("dev_init:\n");
+	// dev->init();
 	// kmt->create(tty1, "tty_reader", tty_reader, "tty1");
   	// kmt->create(tty2, "tty_reader", tty_reader, "tty2");
 

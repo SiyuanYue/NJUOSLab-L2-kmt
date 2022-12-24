@@ -36,7 +36,7 @@ struct spinlock
   char name[20];
 };
 
-struct semaphore
+typedef struct semaphore
 {
     int count;
     char name[20];
@@ -44,8 +44,9 @@ struct semaphore
     task_t* pool[64];
     int l;
     int r;
-};
+}semaphore;
 
 
 void * isAbleHold(void *start,size_t *size);
+
 

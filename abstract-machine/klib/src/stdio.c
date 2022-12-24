@@ -2,7 +2,10 @@
 #include <klib.h>
 #include <klib-macros.h>
 #include <stdarg.h>
-
+// static struct {
+//   struct spinlock lock;
+//   int locking;
+// } pr;
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 unsigned long m_pow_n(unsigned long m, unsigned long n)
 {
@@ -30,6 +33,11 @@ int printf(const char *fmt, ...)
     int cnt = 0;          // 数据长度计数
     va_list pArgs;        // 定义va_list类型指针，用于存储参数的地址
     va_start(pArgs, fmt); // 初始化pArgs
+    // int locking;
+    // locking=pr.locking;
+    // if (locking)
+    //     kmt->spin_lock(&pr.lock);
+
     while (*pStr != '\0')
     {
         switch (*pStr)
@@ -171,6 +179,8 @@ int printf(const char *fmt, ...)
         }
         pStr++;
     }
+    // if(locking)
+    //     kmt->spin_lock(&pr.lock);
     va_end(pArgs);
     return ret_num;
 }
