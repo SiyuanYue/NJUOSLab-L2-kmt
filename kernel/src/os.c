@@ -42,19 +42,21 @@ void sort_handlers()
 		}
 	}
 }
-// static void tty_reader(void *arg) {
-//   device_t *tty = dev->lookup(arg);
-//   char cmd[128], resp[128], ps[16];
-//   snprintf(ps, 16, "(%s) $ ", arg);
-//   while (1) {
-//     tty->ops->write(tty, 0, ps, strlen(ps));
-//     int nread = tty->ops->read(tty, 0, cmd, sizeof(cmd) - 1);
-//     cmd[nread] = '\0';
-//     sprintf(resp, "tty reader task: got %d character(s).\n", strlen(cmd));
-//     tty->ops->write(tty, 0, resp, strlen(resp));
-//   }
-// }
-
+static void tty_reader(void *arg) {
+  device_t *tty = dev->lookup(arg);
+  char cmd[128], resp[128], ps[16];
+  snprintf(ps, 16, "(%s) $ ", arg);
+  while (1) {
+    tty->ops->write(tty, 0, ps, strlen(ps));
+    int nread = tty->ops->read(tty, 0, cmd, sizeof(cmd) - 1);
+    cmd[nread] = '\0';
+    sprintf(resp, "tty reader task: got %d character(s).\n", strlen(cmd));
+    tty->ops->write(tty, 0, resp, strlen(resp));
+  }
+}
+static inline task_t *task_alloc() {
+  return pmm->alloc(sizeof(task_t));
+}
 static void os_init()
 {
 	pmm->init();
@@ -68,18 +70,15 @@ static void os_init()
 		currents[i]=idle;
 	}
 	_current->status=RUNNING;
-	//printf("start\n");
-	//test01();
-	//printf("%d\n",ienabled());
-	// task_t* tty1=pmm->alloc(sizeof(task_t));
-	// task_t* tty2=pmm->alloc(sizeof(task_t));
 
+	// test01();
 	//TODO :实现信号量 P（消费者） V（生产者） 操作
-	test03();
-	// printf("dev_init:\n");
-	// dev->init();
-	// kmt->create(tty1, "tty_reader", tty_reader, "tty1");
-  	// kmt->create(tty2, "tty_reader", tty_reader, "tty2");
+	//test03();
+
+	printf("dev_init:\n");
+	dev->init();
+	kmt->create(task_alloc(), "tty_reader", tty_reader, "tty1");
+  	kmt->create(task_alloc(), "tty_reader", tty_reader, "tty2");
 
 }
 Context *os_trap(Event ev, Context *ctx)
