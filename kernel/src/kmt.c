@@ -48,7 +48,7 @@ static void spin_lock(spinlock_t *lk)
         while (atomic_xchg(&lk->lock, 1) != 0)
         {
             // iset(true);
-            //yield();
+            yield();
             // iset(false);
         }
     // }
