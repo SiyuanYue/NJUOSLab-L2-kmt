@@ -207,7 +207,7 @@ static void sem_init(sem_t *sem, const char *name, int value)
 //     kmt->spin_unlock(&sem->lock);
 // }
 void sem_wait_base(sem_t *sem)
-{//P()
+{
     assert(sem);
     bool succ=false;
     while(!succ)
@@ -227,7 +227,7 @@ void sem_wait_base(sem_t *sem)
   }
 }
 void sem_signal_base(sem_t *sem)
-{//V()
+{
     assert(sem);
     kmt->spin_lock(&(sem->lock));
     sem->count++;
