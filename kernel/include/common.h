@@ -41,11 +41,10 @@ typedef struct semaphore
     int count;
     char name[20];
     struct spinlock lock;
-    task_t* pool[64];
-    int l;
-    int r;
+    task_t* pool[64];//等待队列线程池
+    int l;//等待队列头
+    int r;//等待队列尾
 }semaphore;
-
 void sem_wait_base(sem_t *sem);
 void sem_signal_base(sem_t *sem);
 

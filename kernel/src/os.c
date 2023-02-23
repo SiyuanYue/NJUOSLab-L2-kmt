@@ -42,18 +42,18 @@ void sort_handlers()
 		}
 	}
 }
-// static void tty_reader(void *arg) {
-//   device_t *tty = dev->lookup(arg);
-//   char cmd[128], resp[128], ps[16];
-//   snprintf(ps, 16, "(%s) $ ", arg);
-//   while (1) {
-//     tty->ops->write(tty, 0, ps, strlen(ps));
-//     int nread = tty->ops->read(tty, 0, cmd, sizeof(cmd) - 1);
-//     cmd[nread] = '\0';
-//     sprintf(resp, "tty reader task: got %d character(s).\n", strlen(cmd));
-//     tty->ops->write(tty, 0, resp, strlen(resp));
-//   }
-// }
+static void tty_reader(void *arg) {
+  device_t *tty = dev->lookup(arg);
+  char cmd[128], resp[128], ps[16];
+  snprintf(ps, 16, "(%s) $ ", arg);
+  while (1) {
+    tty->ops->write(tty, 0, ps, strlen(ps));
+    int nread = tty->ops->read(tty, 0, cmd, sizeof(cmd) - 1);
+    cmd[nread] = '\0';
+    sprintf(resp, "tty reader task: got %d character(s).\n", strlen(cmd));
+    tty->ops->write(tty, 0, resp, strlen(resp));
+  }
+}
 static inline task_t *task_alloc() {
   return pmm->alloc(sizeof(task_t));
 }
@@ -65,20 +65,23 @@ static void os_init()
 	kmt->init();
 	for (size_t i = 0; i < cpu_count(); i++)
 	{
-		task_t* idle=(task_t *)pmm->alloc(sizeof(task_t));
-		kmt->create(idle,"idle",NULL,(void *)"");
-		currents[i]=idle;
+		char name[20];
+		sprintf(name,"idle %d",i);
+		task_t *t=task_alloc();
+		kmt->create(t,name,NULL,(void *)i);
+		currents[i]=t;
+		t->status=RUNNING;
 	}
 	_current->status=RUNNING;
 
-	test01();
-	//TODO :实现信号量 P（消费者） V（生产者） 操作
-	//test03();
+	//test01(); //一个一直打印字符的两个线程调度测试
 
-	// printf("dev_init:\n");
-	// dev->init();
-	// kmt->create(task_alloc(), "tty_reader", tty_reader, "tty1");
-  	// kmt->create(task_alloc(), "tty_reader", tty_reader, "tty2");
+	//test02(); //信号量PV测试
+
+	printf("dev_init:\n");
+	dev->init(); //dev模块测试
+	kmt->create(task_alloc(), "tty_reader", tty_reader, "tty1");
+  	kmt->create(task_alloc(), "tty_reader", tty_reader, "tty2");
 
 }
 Context *os_trap(Event ev, Context *ctx)
@@ -90,7 +93,6 @@ Context *os_trap(Event ev, Context *ctx)
 		handlers_seq h = handlers_sorted_by_seq[i];
 		if (h.event == EVENT_NULL || h.event == ev.event)
 		{
-			//printf("%d  seq:%d\n",i,h.seq);
 			Context *r = h.handler(ev, ctx);
 			panic_on(r && next, "returning multiple contexts");
 			if (r)
@@ -113,13 +115,9 @@ void os_irq(int seq, int event, handler_t handler)
 }
 static void os_run()
 {
-	iset(true);
-	// for (const char *s = "Hello World from CPU #*\n"; *s; s++)
-	// {
-	// 	putch(*s == '*' ? '0' + cpu_current() : *s);
-	// }
+	printf("OS RUN \n");
+	iset(true);// 要打开，不然之后的线程无法切换
 	while (true);
-	//yield();
 }
 MODULE_DEF(os) = {
 	.init = os_init,

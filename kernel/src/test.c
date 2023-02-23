@@ -1,8 +1,8 @@
 #include <test.h>
 #include <os.h>
 #include <common.h>
-#define P sem_wait_base
-#define V sem_signal_base
+#define P kmt->sem_wait
+#define V kmt->sem_signal
 // void P(sem_t *sem);
 // void V(sem_t *sem);
 static inline task_t *task_alloc() {
@@ -50,6 +50,7 @@ void test01()
 	task_t *task2=(task_t*) pmm->alloc(sizeof(task_t));
 	kmt->create(task1,"foo1",foo,(void *)"a");
 	kmt->create(task2,"foo2",foo,(void *)"b");
+	printf("test01: \n");
 }
 sem_t empty1;
 sem_t fill1;

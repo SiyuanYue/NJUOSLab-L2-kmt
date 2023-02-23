@@ -42,19 +42,17 @@ static void spin_init(spinlock_t *lk, const char *name)
 }
 static void spin_lock(spinlock_t *lk)
 {
-    //assert(lk->lock==0);
-    // if (cpus[cpu_current()].noff == 1)
-    // {
-        while (atomic_xchg(&lk->lock, 1) != 0)
-        {
-            // iset(true);
+
+    while (atomic_xchg(&lk->lock, 1) != 0)
+    {
+        if(ienabled())
             yield();
-            // iset(false);
-        }
-    // }
-    push_off();
+    }
+    push_off(); // disable interrupts to avoid deadlock.
+    #ifdef delock
     //printf("thread %s : %s , cpu's intena:%d  \n",_current->name ,lk->name,cpus[cpu_current()].intena);
     //printf("thread %s : %s \n",_current->name ,lk->name);
+    #endif
     lk->cpu = cpu_current();
 }
 static void spin_unlock(spinlock_t *lk)
@@ -69,39 +67,32 @@ static void spin_unlock(spinlock_t *lk)
 
 static Context *kmt_context_save(Event ev, Context *context)
 {
-    // if(ev.event==EVENT_YIELD)
-    // {
-    //     printf("yield - save context(%s)\n",_current->name);
-    // }
-    //memcpy(_current->context, context, sizeof(Context));
     _current->context=*context;
+    _current->status=RUNABLE;
     return NULL;
 }
 static Context *kmt_schedule(Event ev, Context *context)
 {
-    size_t i = _current->index + 1;
+    size_t i;
     if(task_cnt==_current->index)
         i=0;
+    else
+        i=_current->index + 1;
     for (; i <= task_cnt; i++)
     {
-        if (alltasks[i] && alltasks[i]->status != BLOCKED)
+        if (alltasks[i] && alltasks[i]->status != BLOCKED &&alltasks[i]->status!=RUNNING)
             break;
         if (i == task_cnt)
         {
             i = 0;
-            assert(false);
+            //assert(false);
         }
     }
+    #ifdef DEBUG
+    printf("\nCPUID:%d , from [%s] schedule to [%s]\n",cpu_current(),_current->name,alltasks[i]->name);
+    #endif
     _current = alltasks[i];
     _current->status = RUNNING;
-    // if(ev.event==EVENT_YIELD)
-    // {
-    //     printf("yield - schedule to [%s]\n",_current->name);
-    // }
-    // else
-    // {
-    //     printf("schedule to [%s]\n",_current->name);
-    // }
     return &(_current->context);
 }
 static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg)
@@ -122,7 +113,7 @@ static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), 
         }
     }
     //printf("task->index: %d\n", i);
-    alltasks[i] = task;
+    alltasks[i] = task;//加入线程池中
     task->index = i;
     if (i >= task_cnt)
         task_cnt = i;
@@ -140,10 +131,9 @@ static void kmt_teardown(task_t *task)
 }
 static void kmt_init()
 {
-    // printf("what happened\n");
     os->on_irq(INT_MIN, EVENT_NULL, kmt_context_save); // 总是最先调用
     os->on_irq(INT_MAX, EVENT_NULL, kmt_schedule);
-    for (size_t i = 0; i < cpu_count(); i++)
+    for (size_t i = 0; i < 16; i++)
     {
         currents[i] = NULL;
         cpus[i].noff = 0;
@@ -165,47 +155,59 @@ static void sem_init(sem_t *sem, const char *name, int value)
     sem->r = 0;
     strcpy(sem->name, name);
 }
+
+//信号量 sem ：
+
+//这里的睡眠信号量part总归是存在 BUG TODO
 // static void wakeup(sem_t *sem)
 // {
-//     assert(sem->l - sem->r != 0);
-//     task_t *t = sem->pool[sem->l];
-//     sem->l++;
-//     if (sem->l == MAX_TASKS)
-//         sem->l = 0;
-//     t->status = RUNABLE;
-//     kmt->spin_unlock(&sem->lock);
+//     if(sem->l-sem->r!=0)//如果有等待队列有线程
+//     {
+//         task_t *t = sem->pool[sem->l];
+//         t->status = RUNABLE;
+//         sem->l=(sem->l+1)%MAX_TASKS;
+//         //printf("signal %d ,l:%d ,r:%d \n",t->index,sem->l,sem->r);
+//     }
 // }
 // static void sem_signal(sem_t *sem)
 // {
 //     kmt->spin_lock(&sem->lock);
 //     sem->count++;
-//     if (sem->count <= 0)
-//     {
-//         wakeup(sem);
-//     }
-//     else
-//     {
-//         kmt->spin_unlock(&sem->lock);
-//     }
+//     wakeup(sem);
+//     kmt->spin_unlock(&sem->lock);
 // }
 // static void block(sem_t *sem)
 // { //阻塞
-//     _current->status = BLOCKED;
+//     kmt->spin_lock(&sem->lock);
 //     sem->pool[sem->r] = _current;
-//     sem->r++;
-//     if (sem->r == MAX_TASKS)
-//         sem->r = 0;
+//     _current->status = BLOCKED;
+//     sem->r=(sem->r+1)%MAX_TASKS;
+//     //printf("blocked %d ,sem->name:%s ,l:%d ,r:%d \n",_current->index,sem->name,sem->l,sem->r);
 //     kmt->spin_unlock(&sem->lock);
-//     yield();
 // }
 // static void sem_wait(sem_t *sem)
-// { //中断处理程序不可睡眠(sem_wait)，可以调用 sem_signal。
-//     kmt->spin_lock(&sem->lock);
-//     sem->count--;
-//     while (sem->count < 0)
-//         block(sem);
-//     kmt->spin_unlock(&sem->lock);
+// {//中断处理程序不可睡眠(sem_wait)，可以调用 sem_signal。
+//     assert(sem);
+//     bool succ=false;
+//     while(!succ)
+//     {
+//         kmt->spin_lock(&(sem->lock));
+//         if(sem->count>0)
+//         {
+//             sem->count--;
+//             succ=true;
+//         }
+//         kmt->spin_unlock(&(sem->lock));
+//         if(!succ)
+// 		{
+//             block(sem);
+//             if(ienabled())
+//                 yield();
+//         }
+//     }
 // }
+
+//无睡眠的基础信号量
 void sem_wait_base(sem_t *sem)
 {
     assert(sem);
@@ -221,14 +223,13 @@ void sem_wait_base(sem_t *sem)
         kmt->spin_unlock(&(sem->lock));
         if(!succ)
 		{
-            assert(ienabled());
-            yield();
+            if(ienabled())
+                yield();
         }
   }
 }
 void sem_signal_base(sem_t *sem)
 {
-    assert(sem);
     kmt->spin_lock(&(sem->lock));
     sem->count++;
     kmt->spin_unlock(&(sem->lock));
@@ -242,4 +243,5 @@ MODULE_DEF(kmt) = {
     .spin_unlock = spin_unlock,
     .sem_init = sem_init,
     .sem_signal = sem_signal_base,
-    .sem_wait = sem_wait_base};
+    .sem_wait = sem_wait_base
+    };
