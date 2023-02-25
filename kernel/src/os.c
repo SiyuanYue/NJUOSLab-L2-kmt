@@ -76,7 +76,7 @@ static void os_init()
 
 	//test01(); //一个一直打印字符的两个线程调度测试
 
-	//test02(); //信号量PV测试
+	//test03(); //信号量PV测试
 
 	printf("dev_init:\n");
 	dev->init(); //dev模块测试

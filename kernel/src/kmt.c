@@ -42,12 +42,12 @@ static void spin_init(spinlock_t *lk, const char *name)
 }
 static void spin_lock(spinlock_t *lk)
 {
-
     while (atomic_xchg(&lk->lock, 1) != 0)
     {
         if(ienabled())
             yield();
     }
+    for(volatile int i=0;i<10000;++i);
     push_off(); // disable interrupts to avoid deadlock.
     #ifdef delock
     //printf("thread %s : %s , cpu's intena:%d  \n",_current->name ,lk->name,cpus[cpu_current()].intena);
@@ -58,10 +58,11 @@ static void spin_lock(spinlock_t *lk)
 static void spin_unlock(spinlock_t *lk)
 {
     assert(lk->cpu == cpu_current());
-    if (cpus[cpu_current()].noff == 1)
-        lk->cpu = -1;
     atomic_xchg(&lk->lock, 0);
+    lk->cpu=-1;
+    #ifdef delock
     //printf("%s  unlock\n", lk->name);
+    #endif
     pop_off();
 }
 
@@ -74,20 +75,24 @@ static Context *kmt_context_save(Event ev, Context *context)
 static Context *kmt_schedule(Event ev, Context *context)
 {
     size_t i;
+    kmt->spin_lock(&kt);
     if(task_cnt==_current->index)
         i=0;
     else
         i=_current->index + 1;
+    int num=0;
     for (; i <= task_cnt; i++)
     {
+        ++num;
         if (alltasks[i] && alltasks[i]->status != BLOCKED &&alltasks[i]->status!=RUNNING)
             break;
         if (i == task_cnt)
         {
             i = 0;
-            //assert(false);
         }
+        assert(num<100);
     }
+    kmt->spin_unlock(&kt);
     #ifdef DEBUG
     printf("\nCPUID:%d , from [%s] schedule to [%s]\n",cpu_current(),_current->name,alltasks[i]->name);
     #endif
@@ -97,8 +102,8 @@ static Context *kmt_schedule(Event ev, Context *context)
 }
 static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg)
 {
-    task->status = RUNABLE;
     assert(task);
+    task->status = RUNABLE;
     //printf("creat-thread\n");
     kmt->spin_lock(&kt);
     strcpy(task->name, name);
@@ -115,7 +120,7 @@ static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), 
     //printf("task->index: %d\n", i);
     alltasks[i] = task;//加入线程池中
     task->index = i;
-    if (i >= task_cnt)
+    if (i >task_cnt)
         task_cnt = i;
     kmt->spin_unlock(&kt);
     return 0;
